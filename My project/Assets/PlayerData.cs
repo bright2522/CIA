@@ -1,15 +1,17 @@
 ﻿using Fusion;
 using TMPro;
 using UnityEngine;
+using StarterAssets;
 
 public class PlayerData : NetworkBehaviour
 {
     public static PlayerData LocalPlayer;
 
-    [Networked] public bool IsReady { get; set; }
+    [Networked]
+    public bool IsReady { get; set; }
 
     [Networked]
-    public NetworkString<_16> Role { get; set; }
+    public int RoleID { get; set; }
 
     [Header("UI")]
     public TMP_Text statusText;
@@ -19,10 +21,9 @@ public class PlayerData : NetworkBehaviour
     public GameObject endGameUI;
     public GameObject playerCanvas;
 
-    private void Update()
-    {
-        Render();
-    }
+    private bool roleApplied;
+
+    private GameObject currentRoleUI;
     public override void Spawned()
     {
         if (HasInputAuthority)
@@ -35,48 +36,77 @@ public class PlayerData : NetworkBehaviour
         }
     }
 
+    public override void Render()
+    {
+
+        if (!roleApplied &&
+            GameManager.Instance != null &&
+            GameManager.Instance.GameStarted)
+        {
+            ApplyRole();
+            roleApplied = true;
+        }
+
+        if (GameManager.Instance == null)
+            return;
+
+        statusText.text =
+            $"Players : {GameManager.Instance.PlayerCount}\n" +
+            $"Ready : {GameManager.Instance.ReadyCount}/{GameManager.Instance.PlayerCount}";
+
+        if (roleText != null)
+        {
+            roleText.text =
+                GameManager.Instance.roles[RoleID].roleName;
+        }
+
+        if (GameManager.Instance.GameStarted)
+        {
+            float remain =
+                GameManager.Instance.MatchTimer.RemainingTime(Runner) ?? 0;
+
+            int min = Mathf.FloorToInt(remain / 60);
+            int sec = Mathf.FloorToInt(remain % 60);
+
+            timerText.text = $"{min:00}:{sec:00}";
+        }
+    }
+
+    public void ApplyRole()
+    {
+
+        RoleData role =
+            GameManager.Instance.roles[RoleID];
+
+        ThirdPersonController controller =
+            GetComponent<ThirdPersonController>();
+
+        controller.MoveSpeed = role.walkSpeed;
+        controller.SprintSpeed = role.sprintSpeed;
+
+        if (currentRoleUI != null)
+        {
+            Destroy(currentRoleUI);
+        }
+
+        if (role.roleUIPrefab != null)
+        {
+            currentRoleUI =
+                Instantiate(
+                    role.roleUIPrefab,
+                    playerCanvas.transform
+                );
+        }
+    }
+
     public void Ready()
     {
-        if (HasInputAuthority)
-        {
-            RPC_SetReady();
-        }
+        RPC_SetReady();
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
     void RPC_SetReady()
     {
         IsReady = true;
-    }
-
-    public override void Render()
-    {
-        if (roleText != null)
-        {
-            roleText.text = $"Role : {Role}";
-        }
-
-        if (GameManager.Instance != null)
-        {
-            if (statusText != null)
-            {
-                statusText.text =
-                    $"Players : {GameManager.Instance.PlayerCount}\n" +
-                    $"Ready : {GameManager.Instance.ReadyCount}/{GameManager.Instance.PlayerCount}";
-            }
-
-            if (timerText != null &&
-                GameManager.Instance.GameStarted &&
-                GameManager.Instance.MatchTimer.IsRunning)
-            {
-                float remain =
-                    GameManager.Instance.MatchTimer.RemainingTime(Runner) ?? 0;
-
-                int min = Mathf.FloorToInt(remain / 60);
-                int sec = Mathf.FloorToInt(remain % 60);
-
-                timerText.text = $"{min:00}:{sec:00}";
-            }
-        }
     }
 }

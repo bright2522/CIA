@@ -3160,6 +3160,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c8d14250be4fd64685e264b4bb13125, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  roles:
+  - {fileID: 11400000, guid: f7bc801dac95bf0489e36a5fbf9b7273, type: 2}
+  - {fileID: 11400000, guid: 4e77ee200d242994bb241e9d56bd5e57, type: 2}
   _GameStarted: 0
   _PlayerCount: 0
   _ReadyCount: 0

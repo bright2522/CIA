@@ -7,21 +7,20 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
 
-    [Networked] public bool GameStarted { get; set; }
+    [Header("Roles")]
+    public RoleData[] roles;
 
-    [Networked] public TickTimer MatchTimer { get; set; }
+    [Networked]
+    public bool GameStarted { get; set; }
 
-    [Networked] public int PlayerCount { get; set; }
+    [Networked]
+    public TickTimer MatchTimer { get; set; }
 
-    [Networked] public int ReadyCount { get; set; }
+    [Networked]
+    public int PlayerCount { get; set; }
 
-    private readonly string[] roles =
-    {
-        "A",
-        "B",
-        "C",
-        "D"
-    };
+    [Networked]
+    public int ReadyCount { get; set; }
 
     private void Awake()
     {
@@ -33,11 +32,11 @@ public class GameManager : NetworkBehaviour
         if (!HasStateAuthority)
             return;
 
-        UpdatePlayerCounts();
+        UpdatePlayerInfo();
 
         if (!GameStarted)
         {
-            CheckAllReady();
+            CheckReady();
         }
         else
         {
@@ -48,7 +47,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    void UpdatePlayerCounts()
+    void UpdatePlayerInfo()
     {
         PlayerData[] players =
             FindObjectsOfType<PlayerData>();
@@ -57,16 +56,16 @@ public class GameManager : NetworkBehaviour
 
         int ready = 0;
 
-        foreach (var player in players)
+        foreach (var p in players)
         {
-            if (player.IsReady)
+            if (p.IsReady)
                 ready++;
         }
 
         ReadyCount = ready;
     }
 
-    void CheckAllReady()
+    void CheckReady()
     {
         PlayerData[] players =
             FindObjectsOfType<PlayerData>();
@@ -74,9 +73,9 @@ public class GameManager : NetworkBehaviour
         if (players.Length < 2)
             return;
 
-        foreach (var player in players)
+        foreach (var p in players)
         {
-            if (!player.IsReady)
+            if (!p.IsReady)
                 return;
         }
 
@@ -87,17 +86,29 @@ public class GameManager : NetworkBehaviour
     {
         GameStarted = true;
 
-        List<string> rolePool =
-            new List<string>(roles);
+        List<int> rolePool =
+            new List<int>();
+
+        for (int i = 0; i < roles.Length; i++)
+        {
+            rolePool.Add(i);
+        }
 
         foreach (var player in players)
         {
-            int index =
+            int randomIndex =
                 Random.Range(0, rolePool.Count);
 
-            player.Role = rolePool[index];
+            int roleID =
+                rolePool[randomIndex];
 
-            rolePool.RemoveAt(index);
+            player.RoleID = roleID;
+
+            rolePool.RemoveAt(randomIndex);
+
+            Debug.Log(
+                $"{player.Object.InputAuthority} ได้ Role : {roles[roleID].roleName}"
+            );
 
             CharacterController cc =
                 player.GetComponent<CharacterController>();
@@ -120,28 +131,28 @@ public class GameManager : NetworkBehaviour
         RPC_GameStarted();
     }
 
-    void EndGame()
-    {
-        GameStarted = false;
-
-        RPC_ShowEndGame();
-    }
-
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     void RPC_GameStarted()
     {
         Debug.Log("Game Started");
     }
 
+    void EndGame()
+    {
+        GameStarted = false;
+
+        RPC_EndGame();
+    }
+
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    void RPC_ShowEndGame()
+    void RPC_EndGame()
     {
         PlayerData[] players =
             FindObjectsOfType<PlayerData>();
 
         foreach (var player in players)
         {
-            var controller =
+            ThirdPersonController controller =
                 player.GetComponent<ThirdPersonController>();
 
             if (controller != null)
@@ -149,8 +160,7 @@ public class GameManager : NetworkBehaviour
                 controller.enabled = false;
             }
 
-            if (player.HasInputAuthority &&
-                player.endGameUI != null)
+            if (player.HasInputAuthority)
             {
                 player.endGameUI.SetActive(true);
             }
