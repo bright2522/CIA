@@ -91,11 +91,11 @@ public class PlayerData : NetworkBehaviour
 
         if (role.roleUIPrefab != null)
         {
-            currentRoleUI =
-                Instantiate(
-                    role.roleUIPrefab,
-                    playerCanvas.transform
-                );
+            currentRoleUI = Instantiate(
+    role.roleUIPrefab,
+    playerCanvas.transform,
+    false
+);
         }
     }
 
