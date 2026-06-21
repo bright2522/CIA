@@ -103,6 +103,9 @@ namespace StarterAssets
         private int _animIDFreeFall;
         private int _animIDMotionSpeed;
 
+        public GameObject MobileController;
+        bool initialized;
+
 #if ENABLE_INPUT_SYSTEM
         private PlayerInput _playerInput;
 #endif
@@ -112,7 +115,16 @@ namespace StarterAssets
         private GameObject _mainCamera;
 
         private bool _hasAnimator;
+        public override void FixedUpdateNetwork()
+        {
+            if (initialized) return;
 
+            if (Object != null)
+            {
+                MobileController.SetActive(!Object.HasInputAuthority);
+                initialized = true;
+            }
+        }
         private bool IsCurrentDeviceMouse
         {
             get
@@ -138,7 +150,7 @@ namespace StarterAssets
         private void Start()
         {
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
-            
+
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
@@ -378,7 +390,7 @@ namespace StarterAssets
 
         private void OnFootstep(AnimationEvent animationEvent)
         {
-            if(!gameSetting.SettingData.sound)
+            if (!gameSetting.SettingData.sound)
                 return;
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
@@ -393,7 +405,7 @@ namespace StarterAssets
 
         private void OnLand(AnimationEvent animationEvent)
         {
-            if(!gameSetting.SettingData.sound)
+            if (!gameSetting.SettingData.sound)
                 return;
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
