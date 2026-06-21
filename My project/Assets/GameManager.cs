@@ -32,9 +32,6 @@ public class GameManager : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        if (!HasStateAuthority)
-            return;
-
         UpdatePlayerInfoUI();
 
         if (!GameStarted)
