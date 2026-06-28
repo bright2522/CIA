@@ -37,6 +37,7 @@ public class GameManager : NetworkBehaviour
         if (!GameStarted)
         {
             CheckReady();
+            UpdatePlayerWaitingIndices(); // 👈 เพิ่มฟังก์ชันจัดการลำดับอนิเมชั่นตรงนี้
         }
         else
         {
@@ -46,6 +47,25 @@ public class GameManager : NetworkBehaviour
             {
                 EndGame();
             }
+        }
+    }
+
+    void UpdatePlayerWaitingIndices()
+    {
+        // ทำเฉพาะเครื่องที่เป็น State Authority ของ GameManager (Server/Host) เท่านั้น
+        if (!HasStateAuthority) return;
+
+        PlayerData[] players = FindObjectsOfType<PlayerData>();
+        List<PlayerData> sortedPlayers = new List<PlayerData>(players);
+
+        // เรียงลำดับด้วย Network Object ID เพื่อให้ทุกเครื่องเข้าใจตรงกันแน่นอน
+        sortedPlayers.Sort((a, b) => a.Object.Id.CompareTo(b.Object.Id));
+
+        for (int i = 0; i < sortedPlayers.Count; i++)
+        {
+            // เซ็ตลำดับ (1, 2, 3, 4) ลงใน Networked Property 
+            // ค่านี้จะถูกส่งไปหาผู้เล่นทุกคนใน Network ทันที
+            sortedPlayers[i].WaitingIndex = i + 1;
         }
     }
 
@@ -222,5 +242,25 @@ public class GameManager : NetworkBehaviour
             return;
 
         logText.text += msg + "\n";
+    }
+
+    public int GetPlayerWaitingIndex(PlayerData targetPlayer)
+    {
+        if (targetPlayer == null) return 1;
+
+        // ดึงผู้เล่นทุกคนที่มีอยู่ในซีนปัจจุบัน
+        PlayerData[] players = FindObjectsOfType<PlayerData>();
+
+        // แปลงเป็น List และจัดเรียงลำดับ (เช่น เรียงตาม NetworkObject.Id หรือเวลาที่เข้ามา)
+        // การเรียงตาม ID จะช่วยให้ทุกคนเห็นลำดับตรงกันและนิ่งที่สุด
+        List<PlayerData> sortedPlayers = new List<PlayerData>(players);
+        sortedPlayers.Sort((a, b) => a.Object.Id.CompareTo(b.Object.Id));
+
+        // ค้นหาว่า Player คนนี้อยู่ในลำดับที่เท่าไหร่ของห้อง ณ ปัจจุบัน
+        int index = sortedPlayers.IndexOf(targetPlayer);
+
+        // คืนค่ากลับไปเป็นลำดับ (เริ่มที่ 1 ถึง 4)
+        // ถ้าหาไม่เจอจะคืนค่า 1 เป็น Default กันบั๊ก
+        return index != -1 ? (index + 1) : 1;
     }
 }

@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 884690c150ed16c4981919210370b427, type: 3}
-  m_Name: RoleA
+  m_Name: RoleC
   m_EditorClassIdentifier: Assembly-CSharp::RoleData
-  roleName: Rhinoceros
-  walkSpeed: 3
-  sprintSpeed: 3
-  roleUIPrefab: {fileID: 1901461905520545682, guid: e64a207621eb1ad46b87271c0876a1e2, type: 3}
+  roleName: Squid
+  walkSpeed: 6
+  sprintSpeed: 7
+  roleUIPrefab: {fileID: 6280306259573761181, guid: a236ec4aae018b64d98ac1ede7480f51, type: 3}

@@ -3437,6 +3437,8 @@ MonoBehaviour:
   roles:
   - {fileID: 11400000, guid: f7bc801dac95bf0489e36a5fbf9b7273, type: 2}
   - {fileID: 11400000, guid: 4e77ee200d242994bb241e9d56bd5e57, type: 2}
+  - {fileID: 11400000, guid: e1950a69cee09984ab7bf712ff119ed6, type: 2}
+  - {fileID: 11400000, guid: 16c46cfef7ccdfb45ac9d5aeb72125cb, type: 2}
   gameStateText: {fileID: 921916572}
   playerCountText: {fileID: 2034154880}
   readyCountText: {fileID: 2061335694}

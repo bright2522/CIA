@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 884690c150ed16c4981919210370b427, type: 3}
   m_Name: RoleB
   m_EditorClassIdentifier: Assembly-CSharp::RoleData
-  roleName: TOY67
+  roleName: Skunk
   walkSpeed: 6
   sprintSpeed: 7
   roleUIPrefab: {fileID: 6280306259573761181, guid: ae9e756924a25cd4db6f4770d74e51ac, type: 3}

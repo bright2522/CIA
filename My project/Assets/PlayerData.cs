@@ -24,6 +24,7 @@ public class PlayerData : NetworkBehaviour
     private bool roleApplied;
 
     private GameObject currentRoleUI;
+    [Networked] public int WaitingIndex { get; set; }
     public override void Spawned()
     {
         if (HasInputAuthority)

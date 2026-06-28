@@ -80,6 +80,7 @@ namespace StarterAssets
 
         [SerializeField] private GameSetting gameSetting;
 
+        private int _animIDWaitingIndex;
         // cinemachine
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
@@ -169,17 +170,54 @@ namespace StarterAssets
 
         private void Update()
         {
-            if (HasStateAuthority == false)
-            {
-                return;
-            }
+            // ❌ ลบเงื่อนไข HasStateAuthority == false ออกชั่วคราว หรือย้ายมาไว้ข้างล่าง 
+            // เพื่อให้อนิเมชั่นอัปเดตบนเครื่องของคนอื่น (Proxy) ด้วยครับ
 
             _hasAnimator = TryGetComponent(out _animator);
+
+            // ดึงข้อมูล PlayerData จาก Object ตัวเอง
+            PlayerData playerData = GetComponent<PlayerData>();
+
+            // ====================================================
+            // 🛑 ล็อคการเคลื่อนที่และจัดการอนิเมชั่นขณะรอในห้อง
+            // ====================================================
+            if (GameManager.Instance != null && !GameManager.Instance.GameStarted)
+            {
+                _verticalVelocity = -2f;
+                _speed = 0f;
+                _animationBlend = 0f;
+
+                if (_hasAnimator && playerData != null)
+                {
+                    _animator.SetFloat(_animIDSpeed, 0f);
+                    _animator.SetFloat(_animIDMotionSpeed, 0f);
+                    _animator.SetBool(_animIDGrounded, true);
+                    _animator.SetBool(_animIDJump, false);
+                    _animator.SetBool(_animIDFreeFall, false);
+
+                    // ดึงค่า Networked Property ที่ถูก Sync มาจาก GameManager
+                    _animator.SetInteger(_animIDWaitingIndex, playerData.WaitingIndex);
+                }
+
+                // บล็อกคำสั่ง Input เฉพาะคนที่เป็นเจ้าของตัวละคร (InputAuthority)
+                // ส่วนเครื่องคนอื่น (Proxy) ให้จบการทำงานตรงนี้เพื่อรอแสดงผลอนิเมชั่นอย่างเดียว
+                return;
+            }
+            // ====================================================
+
+            // ⛔ ถอด HasStateAuthority เช็คมาไว้ตรงนี้ เพื่อคุมการเล่นเคลี่อนไหวในเกมปกติ
+            if (HasStateAuthority == false) return;
+
+            if (_hasAnimator)
+            {
+                _animator.SetInteger(_animIDWaitingIndex, 0);
+            }
 
             JumpAndGravity();
             GroundedCheck();
             Move();
         }
+
 
         private void LateUpdate()
         {
@@ -193,6 +231,9 @@ namespace StarterAssets
             _animIDJump = Animator.StringToHash("Jump");
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
+            
+            // ใช้ชื่อนี้จับคู่กับพารามิเตอร์ประเภท Int ใน Animator ของ Unity
+            _animIDWaitingIndex = Animator.StringToHash("WaitingIndex");
         }
 
         private void GroundedCheck()
