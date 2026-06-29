@@ -1,4 +1,4 @@
-#if CMPSETUP_COMPLETE
+﻿#if CMPSETUP_COMPLETE
 using UnityEngine;
 using Fusion;
 using TMPro;
@@ -8,6 +8,9 @@ using System.Collections;
 
 namespace AvocadoShark
 {
+    // กำหนดสถานะผู้เล่น (สไตล์ Dead by Daylight / Identity V)
+    public enum PlayerStatus { Healthy, Injured, Downed }
+
     public class PlayerStats : NetworkBehaviour
     {
         private ChangeDetector _changeDetector;
@@ -18,9 +21,15 @@ namespace AvocadoShark
         [Networked] public NetworkBool VoteKick { get; set; }
         [Networked] public int PositiveVotes { get; set; }
         [Networked] public int NegativeVotes { get; set; }
+        [Networked] public PlayerStatus CurrentStatus { get; set; }
+        // --- เพิ่มตัวแปรสำหรับคูลดาวน์ดาเมจตรงนี้ ---
+        [Networked] public TickTimer DamageCooldownTimer { get; set; }
+        [SerializeField] private float damageCooldownDuration = 2.0f; // ตั้งเวลาคูลดาวน์ตรงนี้ (เช่น 2 วินาที)
+                                                                      // ----------------------------------------
+        public Action<PlayerStatus> OnStatusChanged;
+        // ---------------------------------
 
         public int maxVoteTime = 15;
-
 
         public bool isVoteInitiator = false;
         public Action<int> OnPositiveVotesChanged, OnNegativeVotesChanged, OnVoteTimeUpdated;
@@ -31,13 +40,16 @@ namespace AvocadoShark
         public static PlayerStats instance;
 
         public Action<string> OnPlayerStatsReady;
+
         public override void Spawned()
         {
             _changeDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
             GetComponent<PlayerWorldUIManager>().OnSpeaking += Speaking;
+
             if (HasStateAuthority)
             {
                 PlayerName = FusionConnection.Instance._playerName;
+                CurrentStatus = PlayerStatus.Healthy; // เริ่มต้นเกมให้เป็นสถานะปกติ (Healthy)
                 OnPlayerStatsReady?.Invoke(PlayerName.ToString());
                 playerNameLabel.text = !HasStateAuthority ? PlayerName.ToString() : "";
                 Debug.Log(PlayerName + " Has state authority");
@@ -52,6 +64,8 @@ namespace AvocadoShark
                 playerNameLabel.text = !HasStateAuthority ? PlayerName.ToString() : "";
             }
 
+            // แจ้งเตือนให้ UI Manager ทำการวาดหรือสร้างไอคอนผู้เล่นใหม่ขึ้นมาบนจอ
+            PlayerHUDManager.Instance?.RefreshHUD();
         }
 
         public override void Render()
@@ -76,6 +90,12 @@ namespace AvocadoShark
                         HandleChangeDetection<int>(nameof(NegativeVotes), previousBuffer, currentBuffer,
                             OnNegativeVote);
                         break;
+                    // --- เพิ่มเติม: ดักจับการเปลี่ยนสถานะผู้เล่นเพื่อส่งข้อมูลไปอัปเดต UI ---
+                    case nameof(CurrentStatus):
+                        HandleChangeDetection<PlayerStatus>(nameof(CurrentStatus), previousBuffer, currentBuffer,
+                            OnStatusUpdate);
+                        break;
+                        // -------------------------------------------------------------
                 }
             }
         }
@@ -87,9 +107,10 @@ namespace AvocadoShark
             var (previous, current) = reader.Read(previousBuffer, currentBuffer);
             callback(previous, current);
         }
+
         private void Update()
         {
-            if(!VoteKick)
+            if (!VoteKick)
                 return;
             OnVoteTimeUpdated?.Invoke(Mathf.RoundToInt(VoteTime.RemainingTime(Runner).GetValueOrDefault()));
         }
@@ -101,25 +122,29 @@ namespace AvocadoShark
                 VoteKick = false;
             }
         }
-        
-        // public override void FixedUpdateNetwork()
-        // {
-        //     if (Object.HasStateAuthority)
-        //     {
-        //         if (VoteTime.Expired(Runner) && VoteKick)
-        //         {
-        //             VoteKick = false;
-        //         }
-        //     }
-        //
-        //     OnVoteTimeUpdated?.Invoke(Mathf.FloorToInt((float)VoteTime.RemainingTime(Runner)));
-        // }
 
         protected void UpdatePlayerName(NetworkString<_32> previous, NetworkString<_32> current)
         {
             SessionPlayers.instance.AddPlayer(this);
             playerNameLabel.text = !HasStateAuthority ? current.ToString() : "";
+            // อัปเดต UI เมื่อชื่อจริงส่งมาถึงฝั่ง Client แล้ว
+            PlayerHUDManager.Instance?.RefreshHUD();
         }
+
+        // --- เพิ่มเติม: ฟังก์ชันสำหรับการเปลี่ยนสถานะของผู้เล่น (เรียกใช้จากฝั่งคิลเลอร์ หรือเหตุการณ์โดนโจมตี) ---
+        public void ChangeStatus(PlayerStatus newStatus)
+        {
+            if (Object.HasStateAuthority)
+            {
+                CurrentStatus = newStatus;
+            }
+        }
+
+        private void OnStatusUpdate(PlayerStatus previous, PlayerStatus current)
+        {
+            OnStatusChanged?.Invoke(current);
+        }
+        // -----------------------------------------------------------------------------------------
 
         public void InitializeVoteKick()
         {
@@ -132,7 +157,6 @@ namespace AvocadoShark
 
             if (NotEnoughPlayers())
             {
-                // player count needs to be more than 2 for vote kick to work
                 Debug.Log("Not enough players for vote kick");
                 return;
             }
@@ -176,20 +200,11 @@ namespace AvocadoShark
             Debug.Log($"positive votes {PositiveVotes}");
             if (current)
             {
-                //if (!changed.Behaviour.HasStateAuthority) {
                 SessionPlayers.instance.AddVoteKick(this);
-                // if (HasStateAuthority)
-                //     AddNegativeVote();
-                // if (isVoteInitiator)
-                // {
-                //     isVoteInitiator = false;
-                //     RPC_AddPositiveVote();
-                // }
                 PositiveVotes = 0;
                 NegativeVotes = 0;
-                //}
             }
-            else 
+            else
             {
                 if (HasStateAuthority)
                 {
@@ -217,9 +232,6 @@ namespace AvocadoShark
         public int GetNegativeVotes()
         {
             return (SessionPlayers.instance.activePlayers.Count - PositiveVotes - 1);
-            // incase of 3 players 
-            // total count = 3
-            // criteria for votekick = 2 positive votes
         }
 
         public bool NotEnoughPlayers()
@@ -276,11 +288,13 @@ namespace AvocadoShark
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             SessionPlayers.instance.RemovePlayer(this);
+            // เมื่อผู้เล่นหลุดหรือออกจากเกม ให้ลบไอคอน UI ของคนนั้นออกด้วย
+            PlayerHUDManager.Instance?.RefreshHUD();
+
             if (VoteKick)
             {
                 SessionPlayers.instance.RemoveVoteKick(this);
-                RPC_PlayerVoteResultMessage(
-                    $"Vote kick failed");
+                RPC_PlayerVoteResultMessage($"Vote kick failed");
             }
         }
 
@@ -288,7 +302,6 @@ namespace AvocadoShark
         public void RPC_BeginVoteKick()
         {
             Debug.Log("RPC_BeginVoteKick");
-           // NegativeVotes = 1;                  // first negative vote for player who is being voted out
             VoteKick = true;
             VoteTime = TickTimer.CreateFromSeconds(Runner, maxVoteTime);
         }
@@ -316,6 +329,46 @@ namespace AvocadoShark
         private void Speaking(bool value)
         {
             OnSpeaking?.Invoke(value);
+        }
+        // ลากไปแปะเพิ่มไว้ด้านในคลาส PlayerStats (ต่อท้ายฟังก์ชันอื่นๆ ก็ได้ครับ)
+
+        private void OnTriggerEnter(Collider other)
+        {
+            // 1. เช็คสิทธิ์ควบคุมเครื่องตัวเอง
+            if (!Object.HasStateAuthority) return;
+
+            // 2. เช็ค Tag ของวัตถุทำดาเมจ
+            if (other.CompareTag("DamageToPlayer"))
+            {
+                // 3. ตรวจสอบว่ายังมีคูลดาวน์เหลืออยู่ไหม (ถ้ายังไม่หมดเวลา ให้ข้ามไปเลย ไม่โดนดาเมจ)
+                if (DamageCooldownTimer.ExpiredOrNotRunning(Runner) == false)
+                {
+                    Debug.Log($"[Damage Cooldown] ยังอยู่ในช่วงอมตะ! คูลดาวน์เหลือ: {DamageCooldownTimer.RemainingTime(Runner):F1} วินาที");
+                    return;
+                }
+
+                // 4. ถ้าไม่มีคูลดาวน์ (หรือคูลดาวน์หมดแล้ว) ถึงจะเริ่มคำนวณหักเลือด
+                switch (CurrentStatus)
+                {
+                    case PlayerStatus.Healthy:
+                        ChangeStatus(PlayerStatus.Injured);
+                        // สั่งเริ่มนับเวลาคูลดาวน์ทันทีหลังจากโดนตีขั้นแรก
+                        DamageCooldownTimer = TickTimer.CreateFromSeconds(Runner, damageCooldownDuration);
+                        Debug.Log($"[Damage] {PlayerName} บาดเจ็บ! เปิดใช้งานอมตะชั่วคราว {damageCooldownDuration} วิ");
+                        break;
+
+                    case PlayerStatus.Injured:
+                        ChangeStatus(PlayerStatus.Downed);
+                        // เมื่อล้มแล้วก็เปิดคูลดาวน์ไว้เผื่อระบบอื่นๆ
+                        DamageCooldownTimer = TickTimer.CreateFromSeconds(Runner, damageCooldownDuration);
+                        Debug.Log($"[Damage] {PlayerName} ล้มลง!");
+                        break;
+
+                    case PlayerStatus.Downed:
+                        Debug.Log($"[Damage] {PlayerName} ล้มอยู่แล้ว");
+                        break;
+                }
+            }
         }
     }
 }
